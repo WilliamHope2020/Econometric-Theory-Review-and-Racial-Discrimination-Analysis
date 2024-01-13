@@ -1,0 +1,206 @@
+---
+title: "assignment3_final - William Hope"
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+```{r global-options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1 a)
+
+If we estimate theta by MLE, we get the MLE properties of the estimator when using correctly specified models. The following, and the Cramér-Rao Lower Bound, among other properties:
+
+# Question 1 b)
+
+If we estimate theta by MLE with a different density function as likelihood function, we get the pseudo-true value (a unique maximizer l(theta)) and I(theta-0) is not equal to H(theta-0).
+
+We also get the following that converges in distribution to the square root of n by theta subtract theta-0:
+
+We can use MLE for correctly specified models and slightly change the solution for mis-specified models to theta approximately equal to a normal distribution of theta-0 and the inverse Hessian matrices.
+
+# Question 1 c)
+
+True because the model suggests that the error term is normally distributed, OLS is more efficient than MLE. MLE is better when the error term is not normally distributed.
+
+# Question 1 d)
+
+True. In practice, we do not know the distribution and the error term is not normal. This means we must use MLE, even if we do not use the true distribution because the properties are preferable and we resort to QMLE.
+
+# Question 2
+
+```{r}
+
+## a) Using the vector x generated above, compute the MLE estimate of lambda and estimate the mean and variance of X.
+set.seed(20885971)
+x <- rexp(100, 10)
+
+(lambda <- mean(x))
+
+x <- rchisq(100,10)
+(lambda <- mean(x))
+
+lambda/100
+
+var(x)/100
+```
+
+# Question 2 b)
+
+For mis-specified models, if we use the wrong variance, we will not reject the null hypothesis 5% of the time when it is true.
+
+# Question 2 c)
+
+We use o2 because it gives us the right variance for this particular sample.
+
+#Question 3
+
+```{r}
+data(crime1, package='wooldridge')
+rownames(data)
+
+## a) Explain the benefits of estimating the model by Poisson regression in this case
+
+## A poisson regression is great when the model using binary variables and count data.
+
+## b) We want to test if there are some racial discrimination, so we want to estimate the model using black and hispan as regressors. Estimate the model with GLM using the log link. Interpret the coefficients.
+
+library(lmtest)
+library(sandwich)
+
+fit <- glm(narr86~black+hispan, crime1, family=poisson(link=log))
+knitr::kable(coeftest(fit, vcov=vcovHC)[,])
+
+new_fit <- glm(narr86~black, crime1, family=poisson(link=log))
+knitr::kable(coeftest(new_fit, vcov=vcovHC)[,])
+
+
+
+```
+
+From the results, we can see that black individuals have a much higher score than non-black individuals to get arrested. If we hold black and hispan constant, then black individuals tend to get arrested 84% more often. In addition, the hispan variable is not significant in this case.
+
+
+```{r}
+## c) Estimate the same model using the square root link and interpret the coefficients. Explain why they are different from the ones obtained in the previous question. For the square root link, you need to set family to poisson(link=sqrt)
+
+fit2 <- glm(narr86~black+hispan, crime1, family=poisson(link=sqrt))
+knitr::kable(coeftest(fit2, vcov=vcovHC)[,])
+
+```
+
+Firstly, the coefficients, including the intercept are positive. Secondly, sqrt applies to the proportional differences in the mean while log does not. This means that for every arrest, 28% are Black individuals. Black individuals tend to get arrested more often as a percentage with log. 
+
+
+```{r}
+## d) Try to compute the marginal effect of black and hispan manually for the two models estimated in the previous two questions. Explain the difference. Compare your result with the ones obtained with the margins package.
+
+b <- coef(fit)
+all(fitted(fit)==exp(fit$linear.predictors))
+
+yhat <- fitted(fit)
+mean(yhat*b[2])
+
+mean(yhat*b[3])
+
+b <- coef(fit2)
+all(fitted(fit2)==exp(fit2$linear.predictors))
+
+yhat <- fitted(fit2)
+mean(yhat*b[2])
+
+mean(yhat*b[3])
+
+library(margins)
+m <- margins(fit, vcov=vcovHC(fit)) 
+knitr::kable(summary(m))
+
+m <- margins(fit2, vcov=vcovHC(fit2)) 
+knitr::kable(summary(m))
+```
+
+Margins package helps when we use link=log, as the coefficients are the same. When you use link=sqrt, doing it manually, gives completely different results. When we compare margins results for each model, the coefficents are not that much different. 
+
+## e) Given the results from the previous question, can you conclude that there is racial discrimination? Explain.
+
+No, there is not enough evidence to suggest there is racial discrimination. We need more regressors for similar characteristics of arrests.
+
+
+```{r}
+## f) In order to better test the presence of racial discrimination, control for the proportion of prior convictions (pcnv), time in prison since the age of 18 (tottime) and the number of quarters employed in 1986 (qemp86). For this question, only use the log link. Interpret the marginal effects of the coefficients.
+
+fit3 <- glm(narr86~black+hispan+pcnv+tottime+qemp86, crime1, family=poisson(link=log))
+knitr::kable(coeftest(fit3, vcov=vcovHC)[,])
+
+m <- margins(fit3, vcov=vcovHC(fit3)) 
+knitr::kable(summary(m))
+
+```
+
+Black individuals, holding all other variables constant, in a group of 100 arrests, on average, make up 28 more arrests than non-black individuals. Hispanic individuals holding all other variables constant, in a group of 100 arrests, make up 20 more than non-Hispanic individuals. For pcnv, individuals with same previous convictions, holding all other variables constant, have 16 less arrests. Same applies to qemp86, individuals with the same number of quarters employed in 1986 , holding all other variables constant, have 8 less arrests. In addition, tottime is not significant. 
+
+
+## g) Using the previous model, do you detect discrimination? Do you think the model is better to detect discrimination than the ones from questions 2 and 3? Do you think is it a biased measure of discrimination? Explain.
+
+It is uncertain to say if there is discrimination because the variables are endogenous to the number of arrests. The number of arrests in the better model from the previous question does not necessarily explain discrimination because prior convictions and total time assumes you've done prison time. In addition, it does not seem to test for racial discrimination but conviction discrimination.
+
+# Question 4
+
+```{r}
+data(mroz, package='wooldridge')
+
+## a) Estimate the model using a linear regression. Interpret the coefficients. Make sure you use robust standard errors.
+
+model <- lm(inlf ~ educ+exper+I(exper^2)+huswage+kidslt6, mroz)
+knitr::kable(coeftest(model, vcov=vcovHC)[,])
+
+```
+
+We can't correctly interpret the coefficients because there is no understanding in the model with linear regression.
+
+## b) Explain the benefits of estimating the model by logit and/or probit in this case
+
+When the independent variable is a binary variable, using logit and/or profit allows for easier interpretations of the model.
+
+
+```{r}
+## c) Estimate the model using the logit method. Interpret the results
+
+logit_model <- glm(inlf ~ educ+exper+I(exper^2)+huswage+kidslt6, mroz, family = binomial(link=logit))
+knitr::kable(summary(logit_model)$coef)
+```
+
+Women with one more year of education, same experience, husband wage, and children younger than 6, on average, have 4% more likely to be in the labour force  than women not in the labour force. Women with one more year of experience, same education, husband wage, and children younger than 6, on average, have 4% more likely to be in the labor force  than women not in the labour force. Women in the labour have 1% lower husband wage, with same experience, education, and children younger than 6, on average, than women not in the labour force. Women with one more child younger than the age of 6, are 16% less likely to be in the labour force, with same experience, husband wage, and education, on average, than women not in the labour force.
+
+
+```{r}
+## d) Estimate the model using the probit method. Interpret the results. Explain why the results differ from the previous question.
+
+probit_model <- glm(inlf ~ educ+exper+I(exper^2)+huswage+kidslt6, mroz, family = binomial(link=probit))
+knitr::kable(summary(probit_model)$coef)
+```
+
+Women with one more year of education, same experience, husband wage, and children younger than 6, on average, are 13% more likely to be in the labour force  than women not in the labour force. Women with one more year of experience, same education, husband wage, and children younger than 6, on average, are 12% more likely to be in the labor force  than women not in the labour force. Women in the labour have 3% lower husband wage, with same experience, education, and children younger than 6, on average, than women not in the labour force. Women with one more child younger than the age of 6, are 51% less likely to be in the labour force, with same experience, husband wage, and education, on average, than women not in the labour force.
+
+Logit looks at values as a percentage while probit looks at values as probability, so in this case, the probit link function is better.
+
+```{r}
+## e) Explain how to compute the marginal effect manually in the previous two questions and do it for education.
+
+b2 <- coef(logit_model)
+
+mean(dlogis(probit_model$linear)*b2[2])
+
+b2 <- coef(probit_model)
+mean(dlogis(probit_model$linear)*b2[2])
+```
+
+
+```{r}
+## f) Using the model estimated by logit, compute the marginal effect using the margins package and interpret the coefficient.
+
+m <- margins(logit_model, vcov=vcovHC(logit_model))
+knitr::kable(summary(m))
+```
+Holding the regressors constant (same characteristics), the AME is 4%, so women in the labour force have 4% higher education. For experience, with same characteristics, have 2% more experience than otherwise. For huswage, with same characteristics, have 1% less experience than otherwise. For kidslt6, with same characteristics, have 16% less experience than otherwise. 
